@@ -27,29 +27,12 @@ jobs:
       # Build Android APK
       - run: flutter build apk --release --split-per-abi
 
-      # Build iOS IPA
-      - run: |
-          flutter build ios --no-codesign
-          cd build/ios/iphoneos
-          mkdir Payload
-          cd Payload
-          mklink /d Runner.app ../Runner.app
-          cd ..
-          zip -r app.ipa Payload
-          mv app.ipa ../../app.ipa
-
       # Upload artifacts
-      - name: Upload Artifacts
+      - name: Upload Android APK
         uses: actions/upload-artifact@v3
         with:
           name: android-apk
           path: build/app/outputs/apk/release/
-      
-      - name: Upload iOS IPA
-        uses: actions/upload-artifact@v3
-        with:
-          name: ios-ipa
-          path: build/app.ipa
 
   release:
     name: Create Release
@@ -65,19 +48,10 @@ jobs:
           name: android-apk
           path: .
 
-      # Download iOS IPA
-      - name: Download iOS IPA
-        uses: actions/download-artifact@v3
-        with:
-          name: ios-ipa
-          path: .
-
       # Push to Releases
       - name: Push to Releases
         uses: ncipollo/release-action@v1
         with:
-          artifacts: |
-            *.apk
-            *.ipa
+          artifacts: '*.apk'
           tag: v1.0.${{ github.run_number }}
           token: ${{ secrets.TOKEN }}
