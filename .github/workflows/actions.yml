@@ -10,8 +10,8 @@ on:
       - develop
 name: "Build & Release"
 jobs:
-  build_android:
-    name: Build Android
+  build:
+    name: Build & Release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
@@ -24,64 +24,60 @@ jobs:
           channel: 'stable'
           architecture: x64
 
+      # Build Android APK
       - run: flutter build apk --release --split-per-abi
 
-      - name: Upload Android APK
+      # Build iOS IPA
+      - run: |
+          flutter build ios --no-codesign
+          cd build/ios/iphoneos
+          mkdir Payload
+          cd Payload
+          mklink /d Runner.app ../Runner.app
+          cd ..
+          zip -r app.ipa Payload
+          mv app.ipa ../../app.ipa
+
+      # Upload artifacts
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: android-apk
           path: build/app/outputs/apk/release/
-
-  build_ios:
-    name: Build iOS
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          architecture: x64
-
-      - run: flutter build ios
-
-      - name: Create IPA
-        run: |
-          cd build/ios/iphoneos
-          mkdir Payload
-          cp -r Runner.app Payload/
-          cd Payload
-          zip -r ../app.ipa .
-          
+      
       - name: Upload iOS IPA
         uses: actions/upload-artifact@v3
         with:
           name: ios-ipa
-          path: build/ios/iphoneos/app.ipa
+          path: build/app.ipa
 
   release:
     name: Create Release
     runs-on: windows-latest
-    needs: [build_android, build_ios]
+    needs: [build]
     steps:
       - uses: actions/checkout@v3
 
+      # Download Android APK
       - name: Download Android APK
         uses: actions/download-artifact@v3
         with:
           name: android-apk
           path: .
 
+      # Download iOS IPA
       - name: Download iOS IPA
         uses: actions/download-artifact@v3
         with:
           name: ios-ipa
           path: .
 
+      # Push to Releases
       - name: Push to Releases
         uses: ncipollo/release-action@v1
         with:
           artifacts: |
-            build/app/outputs/apk/release/*.apk,
-            build/ios/iphoneos/app.ipa
+            *.apk
+            *.ipa
           tag: v1.0.${{ github.run_number }}
           token: ${{ secrets.TOKEN }}
